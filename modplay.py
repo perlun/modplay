@@ -7,7 +7,23 @@
 import sys
 import miniaudio
 import libxmplite
+import RPi.GPIO as GPIO
+import atexit
 
+# Note: this means we only support modules with up to 8 channels. Right now, the
+# player will probably naively crash if you try to use it with a module with
+# more channels than that.
+GPIO_PIN_BY_CHANNEL = [
+    18,
+    23,
+    24,
+    25,
+
+    8,
+    7,
+    1,
+    12
+]
 
 class Display:
     def __init__(self, mod_info: libxmplite.ModuleInfo) -> None:
@@ -19,10 +35,18 @@ class Display:
         print("  (", self.mod_info.type, " ", self.mod_info.chn, "channels ", self.mod_info.bpm, "bpm )")
         print("\n#", info.time, "/", info.total_time, "  pos", info.pos, " pat", info.pattern, " row", info.row, "\n")
 
+        i = 0
         for ch in info.channel_info[:mod_info.chn]:
+            if ch.event:
+                gpio_enable(i)
+            else:
+                gpio_disable(i)
+
             print("*" if ch.event else " ", "I{:03d} #{:03d}".format(ch.instrument, ch.note), end="")
             volume = "#" * int((ch.volume / mod_info.gvl) * mod_info.vol_base / 2)
             print(" |", volume.ljust(mod_info.vol_base // 2, " "), "|")
+
+            i += 1
 
         print("\nPress Enter to quit.", flush=True)
 
@@ -41,9 +65,48 @@ def stream_module(xmp: libxmplite.Xmp, display: Display):
         print("XMP Playback error!!", x)
 
 
+def gpio_init():
+    # Enable output mode for our desired GPIO pins
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+    GPIO.setup(18, GPIO.OUT)
+    GPIO.setup(23, GPIO.OUT)
+    GPIO.setup(24, GPIO.OUT)
+    GPIO.setup(25, GPIO.OUT)
+
+    GPIO.setup(8, GPIO.OUT)
+    GPIO.setup(7, GPIO.OUT)
+    GPIO.setup(1, GPIO.OUT)
+    GPIO.setup(12, GPIO.OUT)
+
+
+def enable_led(num):
+    GPIO.output(num, GPIO.HIGH)
+
+
+def disable_led(num):
+    GPIO.output(num, GPIO.LOW)
+
+
+def gpio_enable(i):
+    enable_led(GPIO_PIN_BY_CHANNEL[i])
+
+
+def gpio_disable(i):
+    disable_led(GPIO_PIN_BY_CHANNEL[i])
+
+
+def disable_leds():
+    for i in GPIO_PIN_BY_CHANNEL:
+        disable_led(i)
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         raise SystemExit("must give mod filename to play as argument")
+
+    gpio_init()
+    atexit.register(disable_leds)
 
     device = miniaudio.PlaybackDevice(output_format=miniaudio.SampleFormat.SIGNED16, nchannels=2, sample_rate=44100)
 
