@@ -1,16 +1,8 @@
 #!/usr/bin/python3
 
-"""
-
-Example program that loads the given mod file in the Xmp player,
-and uses it in a miniaudio playback generator function to stream the music.
-
-Probably doesn't work very well on Windows because Windows console doesn't know
-about ANSI escape codes to clear the screen. Try modplay-windows.py there.
-
-(miniaudio: https://pypi.org/project/miniaudio/ )
-
-"""
+#
+# Based on https://github.com/irmen/pylibxmplite/blob/8c79b939c9e9ad7a07fe9cb64e68158b32908974/examples/modplay.py (MIT licensed)
+#
 
 import sys
 import miniaudio
@@ -26,11 +18,13 @@ class Display:
         print("PLAYING MODULE: ", self.mod_info.name)
         print("  (", self.mod_info.type, " ", self.mod_info.chn, "channels ", self.mod_info.bpm, "bpm )")
         print("\n#", info.time, "/", info.total_time, "  pos", info.pos, " pat", info.pattern, " row", info.row, "\n")
+
         for ch in info.channel_info[:mod_info.chn]:
             print("*" if ch.event else " ", "I{:03d} #{:03d}".format(ch.instrument, ch.note), end="")
             volume = "#" * int((ch.volume / mod_info.gvl) * mod_info.vol_base / 2)
             print(" |", volume.ljust(mod_info.vol_base // 2, " "), "|")
-        print("\nPress enter to quit.", flush=True)
+
+        print("\nPress Enter to quit.", flush=True)
 
     def cls(self) -> None:
         print("\033[2J\033[H", end="")
@@ -63,8 +57,13 @@ if __name__ == "__main__":
     next(stream)  # start the generator
     device.start(stream)
 
-    print("\nFile playing in the background. Press enter to stop playback!\n")
-    input()
+    print("\nFile playing in the background. Press Enter to stop playback!\n")
+
+    try:
+        input()
+    except KeyboardInterrupt:
+        # No need to do anything here since the lines below will quit the playback
+        pass
 
     xmp.stop()
     xmp.release()
