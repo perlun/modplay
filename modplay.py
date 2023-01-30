@@ -9,6 +9,8 @@ import miniaudio
 import libxmplite
 import RPi.GPIO as GPIO
 import atexit
+from threading import Thread, Event
+from time import sleep
 
 # Note: this means we only support modules with up to 8 channels. Right now, the
 # player will probably naively crash if you try to use it with a module with
@@ -35,18 +37,10 @@ class Display:
         print("  (", self.mod_info.type, " ", self.mod_info.chn, "channels ", self.mod_info.bpm, "bpm )")
         print("\n#", info.time, "/", info.total_time, "  pos", info.pos, " pat", info.pattern, " row", info.row, "\n")
 
-        i = 0
         for ch in info.channel_info[:mod_info.chn]:
-            if ch.event:
-                gpio_enable(i)
-            else:
-                gpio_disable(i)
-
             print("*" if ch.event else " ", "I{:03d} #{:03d}".format(ch.instrument, ch.note), end="")
             volume = "#" * int((ch.volume / mod_info.gvl) * mod_info.vol_base / 2)
             print(" |", volume.ljust(mod_info.vol_base // 2, " "), "|")
-
-            i += 1
 
         print("\nPress Enter to quit.", flush=True)
 
@@ -63,6 +57,22 @@ def stream_module(xmp: libxmplite.Xmp, display: Display):
             required_frames = yield buffer
     except libxmplite.XmpError as x:
         print("XMP Playback error!!", x)
+
+
+def update_leds(xmp: libxmplite.Xmp, aborted_event: Event):
+    while not aborted_event.is_set():
+        frame_info = xmp.frame_info()
+
+        i = 0
+        for ch in frame_info.channel_info[:mod_info.chn]:
+            if ch.event:
+                gpio_enable(i)
+            else:
+                gpio_disable(i)
+
+            i += 1
+
+        sleep(0.001)
 
 
 def gpio_init():
@@ -89,11 +99,15 @@ def disable_led(num):
 
 
 def gpio_enable(i):
-    enable_led(GPIO_PIN_BY_CHANNEL[i])
+    # Prevent exceptions if the user is playing a module with a higher number of
+    # channels than the defined number of GPIO pins. :)
+    if i < len(GPIO_PIN_BY_CHANNEL):
+        enable_led(GPIO_PIN_BY_CHANNEL[i])
 
 
 def gpio_disable(i):
-    disable_led(GPIO_PIN_BY_CHANNEL[i])
+    if i < len(GPIO_PIN_BY_CHANNEL):
+        disable_led(GPIO_PIN_BY_CHANNEL[i])
 
 
 def disable_leds():
@@ -120,6 +134,11 @@ if __name__ == "__main__":
     next(stream)  # start the generator
     device.start(stream)
 
+    aborted_event = Event()
+
+    display_thread = Thread(target=update_leds, args=(xmp, aborted_event))
+    display_thread.start()
+
     print("\nFile playing in the background. Press Enter to stop playback!\n")
 
     try:
@@ -128,6 +147,10 @@ if __name__ == "__main__":
         # No need to do anything here since the lines below will quit the playback
         pass
 
+    aborted_event.set()
+
     xmp.stop()
     xmp.release()
     device.close()
+
+    display_thread.join()
