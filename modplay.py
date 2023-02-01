@@ -63,16 +63,30 @@ def update_leds(xmp: libxmplite.Xmp, aborted_event: Event):
     while not aborted_event.is_set():
         frame_info = xmp.frame_info()
 
-        i = 0
-        for ch in frame_info.channel_info[:mod_info.chn]:
-            if ch.event:
-                gpio_enable(i)
-            else:
-                gpio_disable(i)
+        if len(frame_info.channel_info[:mod_info.chn]) == 4:
+            # Special logic to use all 8 GPIO channels for 4-channel modules by
+            # simply duplicating the state.
+            i = 0
+            for ch in frame_info.channel_info[:mod_info.chn]:
+                if ch.event:
+                    gpio_enable(i * 2)
+                    gpio_enable(i * 2 + 1)
+                else:
+                    gpio_disable(i * 2)
+                    gpio_disable(i * 2 + 1)
 
-            i += 1
+                i += 1
+        else:
+            i = 0
+            for ch in frame_info.channel_info[:mod_info.chn]:
+                if ch.event:
+                    gpio_enable(i)
+                else:
+                    gpio_disable(i)
 
-        sleep(0.001)
+                i += 1
+
+        sleep(0.05)
 
 
 def gpio_init():
