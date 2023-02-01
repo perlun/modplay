@@ -5,6 +5,12 @@ visualization for Raspberry Pi.
 
 Does not work on platforms where `RPi.GPIO` is not supported
 
+### What it looks like in action
+
+(YouTube link. Module played is [`axelf_8.mod`](https://modarchive.org/index.php?request=view_by_moduleid&query=34469) by Scott Wilkins. Thank you!)
+
+[![Modplayer with 8-channel Raspberry Pi LED visualization](https://img.youtube.com/vi/3TEI_KRq3IY/maxresdefault.jpg)](https://www.youtube.com/watch?v=3TEI_KRq3IY)
+
 ### Requirements
 
 (Tested on Debian bookworm, i.e. not Raspbian, but should be fine there as
